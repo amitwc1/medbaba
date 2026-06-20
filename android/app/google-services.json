@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "100475704905",
+    "project_id": "mindvault-516f1",
+    "storage_bucket": "mindvault-516f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:100475704905:android:a335565ddf8097d683d198",
+        "android_client_info": {
+          "package_name": "com.mindvault.mind_vault"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxcKdtadupDMVimVXLF8AuohfzCrQD_AU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

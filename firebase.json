@@ -1,0 +1,24 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "mindvault-516f1",
+          "appId": "1:100475704905:android:a335565ddf8097d683d198",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "mindvault-516f1",
+          "configurations": {
+            "android": "1:100475704905:android:a335565ddf8097d683d198"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}
