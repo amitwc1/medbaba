@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/constants/route_constants.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -28,20 +29,22 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
 
   void _startRestore() async {
     final authState = ref.read(authNotifierProvider);
-    final user = ref.read(currentUserProvider).value;
     
-    if (user != null) {
-      if (user.isGuest) {
-        setState(() {
-          _statusText = 'Entering local guest mode...';
-        });
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) {
-          context.go(RouteConstants.dashboard);
-        }
-        return;
+    // Check guest mode from AuthNotifier first
+    if (authState.status == AuthStatus.authenticated && authState.isGuest) {
+      setState(() {
+        _statusText = 'Entering local guest mode...';
+      });
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) {
+        context.go(RouteConstants.dashboard);
       }
+      return;
+    }
 
+    // Direct check of FirebaseAuth state to avoid async StreamProvider race conditions
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
       setState(() {
         _statusText = 'Connecting to Cloud Firestore...';
       });
@@ -51,7 +54,7 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
           _statusText = 'Restoring notes, flashcards, and decks...';
         });
         
-        await ref.read(syncProvider.notifier).restore(user.uid);
+        await ref.read(syncProvider.notifier).restore(firebaseUser.uid);
         
         if (mounted) {
           setState(() {
@@ -64,9 +67,20 @@ class _RestoreScreenState extends ConsumerState<RestoreScreen> {
           }
         }
       } catch (e) {
+        debugPrint('[RestoreScreen] Restore Error: $e');
+        String friendlyError = "We couldn't restore your data. Please try again.";
+        final errorStr = e.toString();
+        if (errorStr.contains('permission-denied') || errorStr.contains('Permission denied')) {
+          friendlyError = "We couldn't restore your data because access was denied. Please try again.";
+        } else if (errorStr.contains('network_error') || errorStr.contains('SocketException')) {
+          friendlyError = "We couldn't restore your data due to a network connection issue. Please check your internet and try again.";
+        } else if (errorStr.contains('timeout') || errorStr.contains('TimeoutException')) {
+          friendlyError = "We couldn't restore your data because the request timed out. Please try again.";
+        }
+        
         if (mounted) {
           setState(() {
-            _statusText = 'Restoration failed: ${e.toString()}';
+            _statusText = friendlyError;
           });
         }
       }

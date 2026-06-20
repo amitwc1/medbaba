@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import '../../features/auth/domain/models/app_user.dart';
@@ -14,19 +15,50 @@ class FirestoreRepository {
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _storage = storage ?? FirebaseStorage.instance;
 
+  Future<T> _retryOnPermissionDenied<T>(Future<T> Function() operation) async {
+    int attempts = 0;
+    while (true) {
+      try {
+        return await operation();
+      } catch (e) {
+        final errorStr = e.toString();
+        if (errorStr.contains('permission-denied') || errorStr.contains('Permission denied')) {
+          attempts++;
+          if (attempts >= 4) {
+            rethrow;
+          }
+          debugPrint('[FirestoreRepository] Firestore operation permission-denied (attempt $attempts). Retrying in ${300 * attempts}ms...');
+          await Future.delayed(Duration(milliseconds: 300 * attempts));
+        } else {
+          rethrow;
+        }
+      }
+    }
+  }
+
+  void _verifyAuth() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception("User not authenticated");
+    }
+    debugPrint('[FirestoreRepository] Authenticated user active: UID=${user.uid}, Email=${user.email}, DisplayName=${user.displayName}');
+  }
+
   // ─────────────────────────── USER PROFILE ───────────────────────────
 
   Future<void> saveUser(AppUser user) async {
     debugPrint('[FirestoreRepository] saveUser: UID ${user.uid}');
-    await _firestore.collection('users').doc(user.uid).set(
+    _verifyAuth();
+    await _retryOnPermissionDenied(() => _firestore.collection('users').doc(user.uid).set(
           user.toJson(),
           SetOptions(merge: true),
-        );
+        ));
   }
 
   Future<AppUser?> getUser(String uid) async {
     debugPrint('[FirestoreRepository] getUser: UID $uid');
-    final doc = await _firestore.collection('users').doc(uid).get();
+    _verifyAuth();
+    final doc = await _retryOnPermissionDenied(() => _firestore.collection('users').doc(uid).get());
     if (doc.exists) {
       return AppUser.fromFirestore(doc);
     }
@@ -42,17 +74,18 @@ class FirestoreRepository {
     required Map<String, dynamic> data,
   }) async {
     debugPrint('[FirestoreRepository] saveDocument: $collectionName/$docId for user $uid');
+    _verifyAuth();
     
     // We sanitize keys or datetime values if necessary.
     // Convert DateTime or Timestamp representations for Firestore.
     final sanitizedData = _sanitizeData(data);
 
-    await _firestore
+    await _retryOnPermissionDenied(() => _firestore
         .collection('users')
         .doc(uid)
         .collection(collectionName)
         .doc(docId)
-        .set(sanitizedData, SetOptions(merge: true));
+        .set(sanitizedData, SetOptions(merge: true)));
   }
 
   Future<void> deleteDocument({
@@ -61,12 +94,13 @@ class FirestoreRepository {
     required String docId,
   }) async {
     debugPrint('[FirestoreRepository] deleteDocument: $collectionName/$docId for user $uid');
-    await _firestore
+    _verifyAuth();
+    await _retryOnPermissionDenied(() => _firestore
         .collection('users')
         .doc(uid)
         .collection(collectionName)
         .doc(docId)
-        .delete();
+        .delete());
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> getDocuments({
@@ -75,6 +109,7 @@ class FirestoreRepository {
     DateTime? since,
   }) async {
     debugPrint('[FirestoreRepository] getDocuments: $collectionName for user $uid (since: $since)');
+    _verifyAuth();
     
     Query<Map<String, dynamic>> query = _firestore
         .collection('users')
@@ -87,7 +122,7 @@ class FirestoreRepository {
       query = query.where('updatedAt', isGreaterThan: Timestamp.fromDate(since));
     }
 
-    final snapshot = await query.get();
+    final snapshot = await _retryOnPermissionDenied(() => query.get());
     return snapshot.docs;
   }
 
@@ -95,22 +130,24 @@ class FirestoreRepository {
 
   Future<void> saveProfileSettings(String uid, Map<String, dynamic> settings) async {
     debugPrint('[FirestoreRepository] saveProfileSettings: user $uid');
-    await _firestore
+    _verifyAuth();
+    await _retryOnPermissionDenied(() => _firestore
         .collection('users')
         .doc(uid)
         .collection('settings')
         .doc('profile')
-        .set(settings, SetOptions(merge: true));
+        .set(settings, SetOptions(merge: true)));
   }
 
   Future<Map<String, dynamic>?> getProfileSettings(String uid) async {
     debugPrint('[FirestoreRepository] getProfileSettings: user $uid');
-    final doc = await _firestore
+    _verifyAuth();
+    final doc = await _retryOnPermissionDenied(() => _firestore
         .collection('users')
         .doc(uid)
         .collection('settings')
         .doc('profile')
-        .get();
+        .get());
     return doc.data();
   }
 
@@ -118,22 +155,24 @@ class FirestoreRepository {
 
   Future<void> saveProfileStatistics(String uid, Map<String, dynamic> stats) async {
     debugPrint('[FirestoreRepository] saveProfileStatistics: user $uid');
-    await _firestore
+    _verifyAuth();
+    await _retryOnPermissionDenied(() => _firestore
         .collection('users')
         .doc(uid)
         .collection('statistics')
         .doc('profile')
-        .set(stats, SetOptions(merge: true));
+        .set(stats, SetOptions(merge: true)));
   }
 
   Future<Map<String, dynamic>?> getProfileStatistics(String uid) async {
     debugPrint('[FirestoreRepository] getProfileStatistics: user $uid');
-    final doc = await _firestore
+    _verifyAuth();
+    final doc = await _retryOnPermissionDenied(() => _firestore
         .collection('users')
         .doc(uid)
         .collection('statistics')
         .doc('profile')
-        .get();
+        .get());
     return doc.data();
   }
 

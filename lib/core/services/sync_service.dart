@@ -101,7 +101,7 @@ class SyncService {
     } catch (e, stackTrace) {
       debugPrint('[SyncService] Sync Failure: $e');
       debugPrint('[SyncService] StackTrace: $stackTrace');
-      _updateState(SyncState.failure, error: e.toString());
+      _updateState(SyncState.failure, error: _mapSyncError(e));
     }
   }
 
@@ -367,7 +367,7 @@ class SyncService {
     } catch (e, stackTrace) {
       debugPrint('[SyncService] Restore Failure: $e');
       debugPrint('[SyncService] StackTrace: $stackTrace');
-      _updateState(SyncState.failure, error: e.toString());
+      _updateState(SyncState.failure, error: _mapSyncError(e));
       rethrow;
     }
   }
@@ -702,5 +702,19 @@ class SyncService {
       }
     });
     return result;
+  }
+
+  String _mapSyncError(dynamic e) {
+    final errorStr = e.toString();
+    if (errorStr.contains('permission-denied') || errorStr.contains('Permission denied')) {
+      return "We couldn't restore your data because access was denied. Please try again.";
+    }
+    if (errorStr.contains('network_error') || errorStr.contains('SocketException')) {
+      return "We couldn't restore your data due to a network connection issue. Please check your internet and try again.";
+    }
+    if (errorStr.contains('timeout') || errorStr.contains('TimeoutException')) {
+      return "We couldn't restore your data because the request timed out. Please try again.";
+    }
+    return "We couldn't restore your data. Please try again.";
   }
 }
